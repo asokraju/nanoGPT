@@ -1,0 +1,174 @@
+DeepSeek v2 introduced three auxiliary losses—expert-level, device-level, and communication-level—to avoid routing collapse. However, these auxiliary losses can negatively impact model quality if they overshadow the token-to-expert affinity: this token is better suited for this expert, but routed to other experts for the sake of “balance”.
+
+Thus, v3 eliminates these auxiliary losses entirely and instead introduces a bias term to the gating value. This bias term is only used for routing purposes instead of being included in the overall loss, and only gets manually adjusted when its corresponding expert is overloaded/underloaded.
+We first introduce a generic MoE architecture commonly used in Transformer language models. A standard Transformer language model is constructed by stacking 𝐿 layers of standard
+Transformer blocks, where each block can be represented as follows:
+u𝑙
+1:𝑇 = Self-Att h𝑙−1
+1:𝑇  + h𝑙−1
+1:𝑇 , (1)
+h𝑙
+𝑡 = FFN u𝑡𝑙 + u𝑡𝑙, (2)
+where 𝑇 denotes the sequence length, Self-Att(·) denotes the self-attention module, FFN(·)
+denotes the Feed-Forward Network (FFN), u1: 𝑙 𝑇 ∈ R𝑇×𝑑 are the hidden states of all tokens after
+the 𝑙-th attention module, and h𝑡𝑙 ∈ R𝑑 is the output hidden state of the 𝑡-th token after the 𝑙-th
+Transformer block. For brevity, we omit the layer normalization in the above formulations.
+A typical practice to construct an MoE language model usually substitutes FFNs in a Transformer with MoE layers at specified intervals (Du et al., 2022; Fedus et al., 2021; Lepikhin
+et al., 2021; Zoph, 2022). An MoE layer is composed of multiple experts, where each expert is
+structurally identical to a standard FFN. Then, each token will be assigned to one (Fedus et al.,
+2021) or two (Lepikhin et al., 2021) experts. If the 𝑙-th FFN is substituted with an MoE layer, the
+computation for its output hidden state h𝑡𝑙 is expressed as:
+h𝑙
+𝑡 =
+𝑁∑︁𝑖=1
+𝑔𝑖,𝑡 FFN𝑖 u𝑡𝑙 + u𝑡𝑙, (3)
+𝑔𝑖,𝑡 = (𝑠𝑖,𝑡, 𝑠𝑖,𝑡 ∈ Topk({𝑠𝑗,𝑡|1 ⩽ 𝑗 ⩽ 𝑁}, 𝐾),
+0, otherwise,
+(4)
+𝑠𝑖,𝑡 = Softmax𝑖 u𝑡𝑙𝑇e𝑙 𝑖 , (5)
+where 𝑁 denotes the total number of experts, FFN𝑖(·) is the 𝑖-th expert FFN, 𝑔𝑖,𝑡 denotes the
+gate value for the 𝑖-th expert, 𝑠𝑖,𝑡 denotes the token-to-expert affinity, Topk(·, 𝐾) denotes the set
+comprising 𝐾 highest affinity scores among those calculated for the 𝑡-th token and all 𝑁 experts,
+and e𝑙
+𝑖 is the centroid of the 𝑖-th expert in the 𝑙-th layer. Note that 𝑔𝑖,𝑡 is sparse, indicating that
+only 𝐾 out of 𝑁 gate values are nonzero. This sparsity property ensures computational efficiency
+within an MoE layer, i.e., each token will be assigned to and computed in only 𝐾 experts. Also,
+in the above formulations, we omit the layer normalization operation for brevity.
+41 2 … 𝑁𝑁
+Router
+Input Hidden
+Output Hidden
+…
+Router
+Input Hidden
+Output Hidden
+1 2 3 4 2𝑁𝑁-1 2𝑁𝑁 …
+Router
+Input Hidden
+Output Hidden
+1 2 3 4 2𝑁𝑁-1 2𝑁𝑁
+Shared Expert
+Routed Expert
+𝐾𝐾 = 2 𝐾𝐾 = 4 𝐾𝐾 = 3
+(a) Conventional Top-2 Routing (b) + Fine-grained Expert Segmentation (c) + Shared Expert Isolation
+(DeepSeekMoE)
+Figure 2 | Illustration of DeepSeekMoE. Subfigure (a) showcases an MoE layer with the conventional top-2 routing strategy. Subfigure (b) illustrates the fine-grained expert segmentation
+strategy. Subsequently, subfigure (c) demonstrates the integration of the shared expert isolation
+strategy, constituting the complete DeepSeekMoE architecture. It is noteworthy that across these
+three architectures, the number of expert parameters and computational costs remain constant.
+3. DeepSeekMoE Architecture
+On top of the generic MoE architecture outlined in Section 2, we introduce DeepSeekMoE, which
+is specifically designed to exploit the potential of expert specialization. As illustrated in Figure 2,
+our architecture incorporates two principal strategies: fine-grained expert segmentation and
+shared expert isolation. Both of these strategies are designed to elevate the level of expert
+specialization.
+3.1. Fine-Grained Expert Segmentation
+In scenarios where the number of experts is limited, tokens assigned to a particular expert will
+be more likely to cover diverse types of knowledge. As a consequence, the designated expert
+will intend to learn vastly different types of knowledge in its parameters, and they are hard
+to be simultaneously utilized. However, if each token can be routed to more experts, diverse
+knowledge will gain the potential to be decomposed and learned in different experts respectively.
+In this context, each expert can still retain a high level of expert specialization, contributing to a
+more focused knowledge distribution across experts.
+In pursuit of the goal, while maintaining a consistent number of expert parameters and
+computational cost, we segment the experts with a finer grain. The finer expert segmentation
+enables a more flexible and adaptable combination of activated experts. To be specific, on top of
+a typical MoE architecture shown in Figure 2(a), we segment each expert FFN into 𝑚 smaller
+experts by reducing the FFN intermediate hidden dimension to 𝑚1 times its original size. Since
+each expert becomes smaller, in response, we also increase the number of activated experts to
+𝑚 times to keep the same computation cost, as illustrated in Figure 2(b). With the fine-grained
+5expert segmentation, the output of an MoE layer can be expressed as:
+h𝑙
+𝑡 =
+𝑚𝑁
+∑︁𝑖=1
+𝑔𝑖,𝑡 FFN𝑖 u𝑡𝑙 + u𝑡𝑙, (6)
+𝑔𝑖,𝑡 = (𝑠𝑖,𝑡, 𝑠𝑖,𝑡 ∈ Topk({𝑠𝑗,𝑡|1 ⩽ 𝑗 ⩽ 𝑚𝑁}, 𝑚𝐾),
+0, otherwise,
+(7)
+𝑠𝑖,𝑡 = Softmax𝑖 u𝑡𝑙𝑇e𝑙 𝑖 , (8)
+where the total number of expert parameters is equal to 𝑁 times the number of parameters in a
+standard FFN, and 𝑚𝑁 denotes the total number of fine-grained experts. With the fine-grained
+expert segmentation strategy, the number of nonzero gates will also increases to 𝑚𝐾.
+From a combinatorial perspective, the fine-grained expert segmentation strategy substantially enhances the combinatorial flexibility of activated experts. As an illustrative example,
+we consider the case where 𝑁 = 16. A typical top-2 routing strategy can yield 16 2  = 120 possible combinations. By contrast, if each expert is split into 4 smaller experts, the fine-grained
+routing strategy can yield 64 8  = 4, 426, 165, 368 potential combinations. The surge in combinatorial flexibility enhances the potential for achieving more accurate and targeted knowledge
+acquisition.
+3.2. Shared Expert Isolation
+With a conventional routing strategy, tokens assigned to different experts may necessitate some
+common knowledge or information. As a result, multiple experts may converge in acquiring
+shared knowledge in their respective parameters, thereby resulting in redundancy in expert
+parameters. However, if there are shared experts dedicated to capturing and consolidating
+common knowledge across varying contexts, the parameter redundancy among other routed
+experts will be alleviated. This alleviation of redundancy will contribute to a more parameterefficient model with more specialized experts.
+Towards this objective, in addition to the fine-grained expert segmentation strategy, we
+further isolate 𝐾𝑠 experts to serve as shared experts. Regardless of the router module, each
+token will be deterministically assigned to these shared experts. In order to maintain a constant
+computational cost, the number of activated experts among the other routed experts will be
+decreased by 𝐾𝑠, as depicted in Figure 2(c). With the shared expert isolation strategy integrated,
+an MoE layer in the complete DeepSeekMoE architecture is formulated as follows:
+h𝑙
+𝑡 =
+𝐾𝑠
+∑︁𝑖=1
+FFN𝑖 u𝑡𝑙 +
+𝑚𝑁
+∑︁
+𝑖=𝐾𝑠+1
+𝑔𝑖,𝑡 FFN𝑖 u𝑡𝑙 + u𝑡𝑙, (9)
+𝑔𝑖,𝑡 = (𝑠𝑖,𝑡, 𝑠𝑖,𝑡 ∈ Topk({𝑠𝑗,𝑡|𝐾𝑠 + 1 ⩽ 𝑗 ⩽ 𝑚𝑁}, 𝑚𝐾 − 𝐾𝑠),
+0, otherwise,
+(10)
+𝑠𝑖,𝑡 = Softmax𝑖 u𝑡𝑙𝑇e𝑙 𝑖 . (11)
+Finally, in DeepSeekMoE, the number of shared expert is 𝐾𝑠, the total number of routed experts
+is 𝑚𝑁 − 𝐾𝑠, and the number of nonzero gates is 𝑚𝐾 − 𝐾𝑠.
+It is worth noting that the prototype of shared expert isolation can be credited to Rajbhandari
+et al. (2022). The key distinction lies in the fact that they derive this strategy from an engineering
+perspective, while we approach it from an algorithmic standpoint.
+63.3. Load Balance Consideration
+Automatically learned routing strategies may encounter the issue of load imbalance, which
+manifests two notable defects. Firstly, there is a risk of routing collapse (Shazeer et al., 2017), i.e.,
+the model always selects only a few experts, preventing other experts from sufficient training.
+Secondly, if experts are distributed across multiple devices, load imbalance can exacerbate
+computation bottlenecks.
+Expert-Level Balance Loss. In order to mitigate the risk of routing collapse, we also employ
+an expert-level balance loss. The computation of the balance loss is as follows:
+LExpBal = 𝛼1
+𝑁′
+∑︁𝑖=1
+𝑓𝑖𝑃𝑖, (12)
+𝑓𝑖 =
+𝑁′
+𝐾′𝑇
+𝑇∑︁𝑡=1
+1(Token 𝑡 selects Expert 𝑖), (13)
+𝑃𝑖 =
+1 𝑇
+𝑇∑︁𝑡=1
+𝑠𝑖,𝑡, (14)
+where 𝛼1 is a hyper-parameter called expert-level balance factor, 𝑁′ is equal to (𝑚𝑁 − 𝐾𝑠) and 𝐾′
+is equal to (𝑚𝐾 − 𝐾𝑠) for brevity. 1(·) denotes the indicator function.
+Device-Level Balance Loss. In addition to the expert-level balance loss, we introduce a devicelevel balance loss. When aiming to alleviate computation bottlenecks, it becomes unnecessary
+to enforce strict balance constraints at the expert level, because excessive constraints on load
+balance will compromise model performance. Instead, our primary objective is to ensure
+balanced computation across the devices. If we partition all routed experts into 𝐷 groups
+{E1, E2, ..., E𝐷}, and deploy each group on a single device, the device-level balance loss is
+computed as follows:
+LDevBal = 𝛼2
+𝐷∑︁𝑖=1
+𝑓𝑖′𝑃𝑖′, (15)
+𝑓𝑖′ = 1
+|E𝑖| ∑︁
+𝑗∈E𝑖
+𝑓𝑗, (16)
+𝑃′
+𝑖 = ∑︁
+𝑗∈E𝑖
+𝑃𝑗, (17)
+where 𝛼2 is a hyper-parameter called device-level balance factor. In practice, we set a small
+expert-level balance factor to mitigate the risk of routing collapse, and meanwhile set a larger
+device-level balance factor to promote balanced computation across the devices.
+I want to do this to my moe model. What changes do I need to make.
+ Please explain how it works first.
+
+
