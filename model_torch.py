@@ -113,6 +113,15 @@ class MoE(nn.Module):
         self.num_experts_per_tok = config.num_experts_per_tok
         self.static_experts = config.static_experts  # Number of static experts
         self.num_dynamic_experts = self.total_experts - self.static_experts  # Number of dynamic experts
+        
+        # Validate expert configuration
+        if self.num_dynamic_experts <= 0:
+            raise ValueError("Must have at least one dynamic expert")
+        if self.num_experts_per_tok > self.num_dynamic_experts:
+            raise ValueError(
+                f"num_experts_per_tok ({self.num_experts_per_tok}) must be ≤ "
+                f"number of dynamic experts ({self.num_dynamic_experts})"
+            )
 
         # Initialize dynamic experts
         self.dynamic_experts = nn.ModuleList([MLP(config) for _ in range(self.num_dynamic_experts)])
@@ -154,7 +163,7 @@ class MoE(nn.Module):
             # Sum the outputs from static experts
             y_static = torch.stack(y_static_list, dim=0).sum(dim=0)  # (B, T, C)
         else:
-            y_static = torch.tensor(0.0, device=x.device, dtype=x.dtype)
+            y_static = torch.zeros_like(x)  # Create zero tensor with same shape as input
 
         # Flatten the input to shape (B*T, C)
         x_flat = x.view(-1, C)
@@ -228,13 +237,12 @@ class MoE(nn.Module):
                 auxiliary_loss += self.moe_loss_coef * variance
 
             elif self.moe_loss_type == "entropy_regularization":
-                # Compute entropy of expert usage
-                entropy = -torch.sum(expert_usage * torch.log(expert_usage + 1e-10))
-                # Compute maximum possible entropy
-                max_entropy = torch.log(torch.tensor(float(self.num_dynamic_experts), dtype=x.dtype, device=x.device))
-                # Normalize entropy to range between 0 and 1
+                # Compute entropy-based load balancing loss
+                # Note: expert_usage is mean usage per expert, not a probability distribution
+                expert_probs = expert_usage / expert_usage.sum()  # Normalize to get probability distribution
+                entropy = -torch.sum(expert_probs * torch.log(expert_probs + 1e-10))
+                max_entropy = torch.log(torch.tensor(float(self.num_dynamic_experts), dtype=expert_probs.dtype, device=expert_probs.device))
                 normalized_entropy = entropy / max_entropy
-                # To maximize entropy, minimize negative entropy
                 auxiliary_loss += self.moe_loss_coef * (1 - normalized_entropy)
 
             elif self.moe_loss_type == "diversity_regularization":
@@ -400,9 +408,22 @@ class GPT(nn.Module):
     """
     def __init__(self, config):
         super().__init__()
-        assert config.vocab_size is not None
-        assert config.block_size is not None
+        if not hasattr(config, 'vocab_size') or config.vocab_size is None:
+            raise ValueError("vocab_size must be specified in config")
+        if not hasattr(config, 'block_size') or config.block_size is None:
+            raise ValueError("block_size must be specified in config")
+        
+        # Validate other critical parameters
+        if not hasattr(config, 'n_layer') or config.n_layer <= 0:
+            raise ValueError("n_layer must be positive")
+        if not hasattr(config, 'n_head') or config.n_head <= 0:
+            raise ValueError("n_head must be positive")
+        if not hasattr(config, 'n_embd') or config.n_embd <= 0:
+            raise ValueError("n_embd must be positive")
+            
         self.config = config
+        # Enable gradient checkpointing for memory efficiency
+        self.gradient_checkpointing = getattr(config, 'gradient_checkpointing', False)
 
         # Embedding layers
         self.transformer = nn.ModuleDict(dict(
@@ -450,7 +471,7 @@ class GPT(nn.Module):
 
     def forward(self, idx, targets=None):
         """
-        Forward pass of the GPT model.
+        Forward pass of the GPT model with improved error handling and memory efficiency.
 
         Args:
             idx (torch.Tensor): Input indices of shape (B, T)
@@ -459,42 +480,81 @@ class GPT(nn.Module):
         Returns:
             Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]: Logits, total loss, main loss, auxiliary loss
         """
+        if not isinstance(idx, torch.Tensor):
+            raise TypeError(f"Expected idx to be torch.Tensor, got {type(idx)}")
+        
         device = idx.device
         b, t = idx.size()
-        assert t <= self.config.block_size, \
-            f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}"
-        pos = torch.arange(0, t, dtype=torch.long, device=device)  # Position indices
+        if t > self.config.block_size:
+            raise ValueError(f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}")
+        
+        try:
+            # Position indices
+            pos = torch.arange(0, t, dtype=torch.long, device=device)
 
-        # Embedding lookup
-        tok_emb = self.transformer.wte(idx)  # Token embeddings (B, T, n_embd)
-        pos_emb = self.transformer.wpe(pos)  # Position embeddings (T, n_embd)
-        x = self.transformer.drop(tok_emb + pos_emb)  # Combine embeddings
+            # Embedding lookup
+            tok_emb = self.transformer.wte(idx)  # Token embeddings (B, T, n_embd)
+            pos_emb = self.transformer.wpe(pos)  # Position embeddings (T, n_embd)
+            x = self.transformer.drop(tok_emb + pos_emb)  # Combine embeddings
 
-        # Forward through Transformer blocks
-        auxiliary_losses = []
-        for block in self.transformer.h:
-            x, auxiliary_loss = block(x)
-            auxiliary_losses.append(auxiliary_loss)
+            # Forward through Transformer blocks with gradient checkpointing
+            auxiliary_losses = []
+            
+            def custom_forward(block, x_inner):
+                return block(x_inner)
+            
+            for block in self.transformer.h:
+                if self.gradient_checkpointing and self.training:
+                    x_block, auxiliary_loss = torch.utils.checkpoint.checkpoint(
+                        custom_forward, block, x
+                    )
+                else:
+                    x_block, auxiliary_loss = block(x)
+                x = x_block
+                auxiliary_losses.append(auxiliary_loss)
 
-        x = self.transformer.ln_f(x)  # Final LayerNorm
+            x = self.transformer.ln_f(x)  # Final LayerNorm
 
-        if targets is not None:
-            # Compute logits and main loss
-            logits = self.lm_head(x)
-            main_loss = F.cross_entropy(
-                logits.view(-1, logits.size(-1)),
-                targets.view(-1),
-                ignore_index=-1
-            )
-            # Compute mean of the auxiliary losses
-            total_auxiliary_loss = torch.stack(auxiliary_losses).mean()
-            # Combine main loss and auxiliary loss
-            loss = main_loss + total_auxiliary_loss
-            return logits, loss, main_loss, total_auxiliary_loss
-        else:
-            # Inference mode: only compute logits for the last position
-            logits = self.lm_head(x[:, [-1], :])  # (B, 1, vocab_size)
-            return logits, None, None, None
+            if targets is not None:
+                # Check for NaN/Inf values
+                if torch.isnan(x).any() or torch.isinf(x).any():
+                    raise ValueError("NaN or Inf values detected in model output")
+                
+                # Compute logits and main loss
+                logits = self.lm_head(x)
+                
+                # Validate targets
+                if not torch.isfinite(targets).all():
+                    raise ValueError("Invalid target values detected")
+                
+                main_loss = F.cross_entropy(
+                    logits.view(-1, logits.size(-1)),
+                    targets.view(-1),
+                    ignore_index=-1,
+                    reduction='mean'
+                )
+                
+                # Compute mean of the auxiliary losses
+                total_auxiliary_loss = torch.stack(auxiliary_losses).mean()
+                
+                # Check loss values
+                if not torch.isfinite(main_loss):
+                    raise ValueError("Non-finite main loss detected")
+                if not torch.isfinite(total_auxiliary_loss):
+                    raise ValueError("Non-finite auxiliary loss detected")
+                
+                # Combine main loss and auxiliary loss
+                loss = main_loss + total_auxiliary_loss
+                return logits, loss, main_loss, total_auxiliary_loss
+            else:
+                # Inference mode: only compute logits for the last position
+                logits = self.lm_head(x[:, [-1], :])  # (B, 1, vocab_size)
+                return logits, None, None, None
+                
+        except RuntimeError as e:
+            if "out of memory" in str(e):
+                raise RuntimeError(f"GPU out of memory error: {str(e)}. Try reducing batch size or enabling gradient checkpointing.")
+            raise e
 
     def crop_block_size(self, block_size):
         # model surgery to decrease the block size if necessary
@@ -509,58 +569,122 @@ class GPT(nn.Module):
 
     @classmethod
     def from_pretrained(cls, model_type, override_args=None):
-        assert model_type in {'gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl'}
-        override_args = override_args or {} # default to empty dict
-        # only dropout can be overridden see more notes below
-        assert all(k == 'dropout' for k in override_args)
-        from transformers import GPT2LMHeadModel
-        print("loading weights from pretrained gpt: %s" % model_type)
-
-        # n_layer, n_head and n_embd are determined from model_type
+        """
+        Load pretrained weights from HuggingFace GPT2 checkpoints.
+        Note: This requires use_moe=False as GPT2 doesn't use Mixture of Experts.
+        
+        Args:
+            model_type (str): One of 'gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl'
+            override_args (dict, optional): Arguments to override in the config
+            
+        Returns:
+            GPT: Initialized model with pretrained weights
+            
+        Raises:
+            ValueError: If invalid model_type or override arguments
+        """
+        if model_type not in {'gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl'}:
+            raise ValueError(f"Invalid model_type: {model_type}")
+            
+        override_args = override_args or {}
+        
+        # Validate override arguments
+        valid_overrides = {'dropout', 'use_moe', 'bias'}
+        invalid_args = set(override_args.keys()) - valid_overrides
+        if invalid_args:
+            raise ValueError(f"Invalid override arguments: {invalid_args}")
+            
+        # Force use_moe=False when loading pretrained weights
+        if override_args.get('use_moe', True):
+            print("Warning: Setting use_moe=False as pretrained GPT2 doesn't support MoE")
+        override_args['use_moe'] = False
+        
+        try:
+            from transformers import GPT2LMHeadModel
+        except ImportError:
+            raise ImportError("Please install transformers: pip install transformers")
+            
+        print(f"Loading weights from pretrained GPT2: {model_type}")
+        
+        # Base configuration from model type
         config_args = {
-            'gpt2':         dict(n_layer=12, n_head=12, n_embd=768),  # 124M params
-            'gpt2-medium':  dict(n_layer=24, n_head=16, n_embd=1024), # 350M params
-            'gpt2-large':   dict(n_layer=36, n_head=20, n_embd=1280), # 774M params
-            'gpt2-xl':      dict(n_layer=48, n_head=25, n_embd=1600), # 1558M params
+            'gpt2':         dict(n_layer=12, n_head=12, n_embd=768),    # 124M params
+            'gpt2-medium':  dict(n_layer=24, n_head=16, n_embd=1024),   # 350M params
+            'gpt2-large':   dict(n_layer=36, n_head=20, n_embd=1280),   # 774M params
+            'gpt2-xl':      dict(n_layer=48, n_head=25, n_embd=1600),   # 1558M params
         }[model_type]
-        print("forcing vocab_size=50257, block_size=1024, bias=True")
-        config_args['vocab_size'] = 50257 # always 50257 for GPT model checkpoints
-        config_args['block_size'] = 1024 # always 1024 for GPT model checkpoints
-        config_args['bias'] = True # always True for GPT model checkpoints
-        # we can override the dropout rate, if desired
-        if 'dropout' in override_args:
-            print(f"overriding dropout rate to {override_args['dropout']}")
-            config_args['dropout'] = override_args['dropout']
-        # create a from-scratch initialized minGPT model
-        config = GPTConfig(**config_args)
-        model = GPT(config)
-        sd = model.state_dict()
-        sd_keys = sd.keys()
-        sd_keys = [k for k in sd_keys if not k.endswith('.attn.bias')] # discard this mask / buffer, not a param
-
-        # init a huggingface/transformers model
-        model_hf = GPT2LMHeadModel.from_pretrained(model_type)
-        sd_hf = model_hf.state_dict()
-
-        # copy while ensuring all of the parameters are aligned and match in names and shapes
-        sd_keys_hf = sd_hf.keys()
-        sd_keys_hf = [k for k in sd_keys_hf if not k.endswith('.attn.masked_bias')] # ignore these, just a buffer
-        sd_keys_hf = [k for k in sd_keys_hf if not k.endswith('.attn.bias')] # same, just the mask (buffer)
-        transposed = ['attn.c_attn.weight', 'attn.c_proj.weight', 'mlp.c_fc.weight', 'mlp.c_proj.weight']
-        # basically the openai checkpoints use a "Conv1D" module, but we only want to use a vanilla Linear
-        # this means that we have to transpose these weights when we import them
-        assert len(sd_keys_hf) == len(sd_keys), f"mismatched keys: {len(sd_keys_hf)} != {len(sd_keys)}"
-        for k in sd_keys_hf:
-            if any(k.endswith(w) for w in transposed):
-                # special treatment for the Conv1D weights we need to transpose
-                assert sd_hf[k].shape[::-1] == sd[k].shape
-                with torch.no_grad():
-                    sd[k].copy_(sd_hf[k].t())
-            else:
-                # vanilla copy over the other parameters
-                assert sd_hf[k].shape == sd[k].shape
-                with torch.no_grad():
-                    sd[k].copy_(sd_hf[k])
+        
+        # GPT2 specific settings
+        config_args.update({
+            'vocab_size': 50257,  # Fixed for GPT2
+            'block_size': 1024,   # Fixed for GPT2
+            'bias': True,         # Fixed for GPT2
+        })
+        
+        # Apply any valid overrides
+        config_args.update(override_args)
+        try:
+            # Create our model
+            config = GPTConfig(**config_args)
+            model = cls(config)
+            
+            # Load HuggingFace model
+            print("Loading HuggingFace GPT2 model...")
+            model_hf = GPT2LMHeadModel.from_pretrained(model_type)
+            
+            # Get state dicts
+            sd = model.state_dict()
+            sd_hf = model_hf.state_dict()
+            
+            # Filter out buffer keys (not parameters)
+            sd_keys = [k for k in sd.keys() if not k.endswith('.attn.bias')]
+            sd_keys_hf = [
+                k for k in sd_hf.keys() 
+                if not k.endswith(('.attn.masked_bias', '.attn.bias'))
+            ]
+            
+            # These weights need to be transposed (Conv1D -> Linear conversion)
+            transposed = [
+                'attn.c_attn.weight', 
+                'attn.c_proj.weight', 
+                'mlp.c_fc.weight', 
+                'mlp.c_proj.weight'
+            ]
+            
+            # Copy parameters with shape checking
+            print("Copying parameters...")
+            mismatched_keys = []
+            for k_hf, k in zip(sd_keys_hf, sd_keys):
+                try:
+                    if any(k.endswith(w) for w in transposed):
+                        if sd_hf[k_hf].shape[::-1] != sd[k].shape:
+                            mismatched_keys.append((k_hf, k))
+                            continue
+                        with torch.no_grad():
+                            sd[k].copy_(sd_hf[k_hf].t())
+                    else:
+                        if sd_hf[k_hf].shape != sd[k].shape:
+                            mismatched_keys.append((k_hf, k))
+                            continue
+                        with torch.no_grad():
+                            sd[k].copy_(sd_hf[k_hf])
+                except Exception as e:
+                    print(f"Error copying parameter {k_hf} -> {k}: {str(e)}")
+                    raise
+                    
+            if mismatched_keys:
+                print("\nWarning: Some keys had mismatched shapes:")
+                for k_hf, k in mismatched_keys:
+                    print(f"  {k_hf} -> {k}")
+                    print(f"    HF shape: {sd_hf[k_hf].shape}")
+                    print(f"    Our shape: {sd[k].shape}")
+                    
+            print("Successfully loaded pretrained weights")
+            return model
+            
+        except Exception as e:
+            print(f"Error loading pretrained model: {str(e)}")
+            raise
 
         return model
 
