@@ -166,24 +166,44 @@ class DataLoader:
             max_index = len(data) - self.config.block_size
             ix = torch.randint(max_index, (self.config.batch_size,))
             
-            # Load data with error checking
+            # Load data with error handling and retry logic
             x = []
             y = []
-            for i in ix:
+            valid_samples = 0
+            max_retries = self.config.batch_size * 2  # Allow up to 2x batch_size attempts
+            retry_count = 0
+            
+            while valid_samples < self.config.batch_size and retry_count < max_retries:
                 try:
+                    # Generate a new index if we need more samples
+                    if len(ix) <= valid_samples:
+                        new_ix = torch.randint(max_index, (self.config.batch_size,))
+                        ix = torch.cat([ix[valid_samples:], new_ix])
+                    
                     # Convert tensor index to Python integer
-                    idx = i.item()
+                    idx = ix[valid_samples].item()
                     x_slice = data[idx:idx+self.config.block_size]
                     y_slice = data[idx+1:idx+1+self.config.block_size]
                     
                     if len(x_slice) != self.config.block_size or len(y_slice) != self.config.block_size:
-                        raise ValueError(f"Invalid slice length at index {idx}")
+                        print(f"Warning: Skipping invalid slice at index {idx}")
+                        retry_count += 1
+                        continue
                         
                     x.append(torch.from_numpy(x_slice.astype(np.int64)))
                     y.append(torch.from_numpy(y_slice.astype(np.int64)))
+                    valid_samples += 1
                     
                 except Exception as e:
-                    raise ValueError(f"Error loading data at index {idx}: {str(e)}")
+                    print(f"Warning: Error loading data at index {idx}: {str(e)}")
+                    retry_count += 1
+                    continue
+            
+            if valid_samples < self.config.batch_size:
+                raise ValueError(
+                    f"Failed to gather enough valid samples. "
+                    f"Got {valid_samples}/{self.config.batch_size} after {retry_count} attempts"
+                )
             
             x = torch.stack(x)
             y = torch.stack(y)
@@ -357,23 +377,42 @@ class Trainer:
                             micro_step == self.config.adjusted_gradient_accumulation_steps - 1
                         )
                     
-                    # Process current batch
-                    loss, main_loss, aux_loss, grad_norm = self.train_step(X, Y)
-                    accumulated_loss += loss.item()
-                    accumulated_main_loss += main_loss.item()
-                    accumulated_aux_loss += aux_loss.item()
-                    
-                    # Get next batch for the next micro-step
-                    # This means each micro-step processes a different batch,
-                    # effectively increasing diversity in the accumulated gradients
-                    X, Y = self.data_loader.get_batch('train')
+                    try:
+                        # Process current batch
+                        loss, main_loss, aux_loss, grad_norm = self.train_step(X, Y)
+                        accumulated_loss += loss.item()
+                        accumulated_main_loss += main_loss.item()
+                        accumulated_aux_loss += aux_loss.item()
+                        
+                        # Get next batch for the next micro-step
+                        # This means each micro-step processes a different batch,
+                        # effectively increasing diversity in the accumulated gradients
+                        X, Y = self.data_loader.get_batch('train')
+                    except RuntimeError as e:
+                        if "out of memory" in str(e):
+                            print(f"OOM in micro-step {micro_step}. Skipping remaining micro-steps.")
+                            break
+                        raise e
+
+                # Compute average losses over micro-steps
+                num_steps = micro_step + 1  # Account for possible early break
+                avg_loss = accumulated_loss / num_steps
+                avg_main_loss = accumulated_main_loss / num_steps
+                avg_aux_loss = accumulated_aux_loss / num_steps
 
                 # Gradient clipping and optimizer step
                 if self.config.grad_clip != 0.0:
                     self.scaler.unscale_(self.optimizer)
-                    torch.nn.utils.clip_grad_norm_(
-                        self.model.parameters(), self.config.grad_clip
-                    )
+                    try:
+                        grad_norm = torch.nn.utils.clip_grad_norm_(
+                            self.model.parameters(), self.config.grad_clip
+                        )
+                    except RuntimeError as e:
+                        if "found no gradients" in str(e):
+                            print("Warning: No gradients found during clipping")
+                            grad_norm = torch.tensor(0.0, device=self.device)
+                        else:
+                            raise e
                 
                 self.scaler.step(self.optimizer)
                 self.scaler.update()
@@ -385,7 +424,8 @@ class Trainer:
                 t0 = t1
                 
                 if self.iter_num % self.config.log_interval == 0 and master_process:
-                    self.log_training_step(dt, loss, main_loss, aux_loss, lr, local_iter_num, grad_norm)
+                    # Log average losses over all micro-steps
+                    self.log_training_step(dt, avg_loss, avg_main_loss, avg_aux_loss, lr, local_iter_num, grad_norm)
 
                 # Checkpointing
                 if master_process:
