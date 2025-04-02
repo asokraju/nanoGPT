@@ -67,5 +67,5 @@ Using rule engine to validate this or to generate meaninful synthatic data?
 
 
 
-Another idea...
-Present a pipeline with agents (LLM) and gather all the reqired rules to verfy the generation and in the end present this in a logical way. No fine tuning. Just prompting and passing it through mutiple LLMs.
+
+Agentic frame
