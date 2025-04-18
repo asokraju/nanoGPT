@@ -1,0 +1,356 @@
+cohorts:
+  - cohort_name: "Heart Failure 30-Day Readmission"
+    inclusion_criteria:
+      - code_type: ICD-10
+        codes: ["I50.20", "I50.22", "I50.32", "I50.33", "I50.9"]
+        description: "Diagnosis of heart failure (systolic or diastolic, including I50.x codes)"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["Z51.5"]
+        description: "Enrollment in hospice/palliative care (no expectation of readmission)"
+      - code_type: ICD-10
+        codes: ["I50.84"]
+        description: "End-stage heart failure (advanced disease often managed differently)"
+    target_event:
+      code_type: ICD-10
+      codes: ["I50.9"]
+      description: "Unplanned hospital readmission (e.g., heart failure-related hospitalization within 30 days)"
+    notes: |
+      This cohort focuses on patients with heart failure who have been recently hospitalized, aiming to predict unplanned readmissions within 30 days of discharge. Inclusion criteria identify individuals with a documented heart failure diagnosis (I50 codes cover systolic, diastolic, and unspecified heart failure), ensuring the model targets those with clinical heart pump dysfunction. Patients in hospice or with end-stage heart failure are excluded because their care goals often shift away from readmission prevention (hospice patients may not seek readmission, and end-stage HF patients may require specialized palliative interventions). The target event is a hospital readmission shortly after an index discharge, reflecting acute decompensation or complications of heart failure or comorbid conditions. Clinically, frequent readmissions indicate uncontrolled symptoms or inadequate outpatient management. By predicting 30-day readmissions, healthcare providers can intervene early with intensive follow-up, medication optimization, or patient education to improve outcomes and reduce hospital utilization.
+
+  - cohort_name: "Prediabetes to Type 2 Diabetes Mellitus"
+    inclusion_criteria:
+      - code_type: ICD-10
+        codes: ["R73.03", "R73.09", "E88.81"]
+        description: "Prediabetes or metabolic syndrome diagnosis (elevated glucose or metabolic risk factors)"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["E10.9", "E11.9", "E13.9"]
+        description: "Existing diabetes mellitus (Type 1, Type 2, or other specified diabetes)"
+      - code_type: ICD-10
+        codes: ["O24.4"]
+        description: "Gestational or pregnancy-related diabetes"
+    target_event:
+      code_type: ICD-10
+      codes: ["E11.9"]
+      description: "New onset Type 2 diabetes mellitus diagnosis"
+    notes: |
+      Prediabetes is a state of elevated blood sugar that has not yet reached the threshold for diabetes, and identifying individuals likely to progress to diabetes is crucial for early intervention. Inclusion criteria cover clinical indications of prediabetes: the ICD codes for prediabetes (impaired glucose tolerance or fasting glucose) and metabolic syndrome (a cluster of insulin resistance, hypertension, and dyslipidemia), which signify high risk for developing type 2 diabetes. Anyone who already carries a diagnosis of diabetes (type 1 or type 2) or even gestational diabetes is excluded, since the goal is to predict new onset of diabetes in those who have not yet been diagnosed. The target event is a new diagnosis of type 2 diabetes mellitus (e.g., an ICD-10 code E11.* appearing), indicating that the patient has transitioned from a prediabetic state to overt diabetes. Clinically, risk factors for this progression include obesity, sedentary lifestyle, and genetic predisposition. Early identification allows interventions like intensive lifestyle modifications or medications (such as metformin in prediabetes) to prevent or delay the onset of type 2 diabetes, thereby reducing the risk of complications like neuropathy, nephropathy, and cardiovascular disease.
+
+  - cohort_name: "CKD Stage 3-5 Progression to ESRD"
+    inclusion_criteria:
+      - code_type: ICD-10
+        codes: ["N18.30", "N18.4", "N18.5"]
+        description: "Chronic kidney disease, stages 3–5 (moderate to severe CKD)"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["N18.6"]
+        description: "End-stage renal disease (already in ESRD)"
+      - code_type: ICD-10
+        codes: ["Z99.2"]
+        description: "Dependence on dialysis (already on dialysis treatment)"
+      - code_type: ICD-10
+        codes: ["Z94.0"]
+        description: "History of kidney transplant (renal transplant recipient)"
+    target_event:
+      code_type: ICD-10
+      codes: ["N18.6", "Z99.2"]
+      description: "Progression to end-stage renal disease (ESRD), e.g., need for chronic dialysis"
+    notes: |
+      Chronic kidney disease (CKD) can advance to end-stage renal disease (ESRD), requiring dialysis or transplant. This cohort targets patients with moderate-to-advanced CKD who have not yet reached ESRD. Inclusion criteria require CKD stage 3, 4, or 5 diagnoses, indicating significantly reduced kidney function but not complete failure. Patients already in ESRD (on maintenance dialysis or with a kidney transplant) are excluded, since the outcome (kidney failure) has effectively occurred or they have moved to a different stage of care. The model’s target event is the onset of ESRD, marked by a new ESRD diagnosis or the initiation of renal replacement therapy (hemodialysis/peritoneal dialysis) as indicated by codes like N18.6 or dialysis dependency status. Clinically, factors such as diabetes, hypertension, proteinuria level, and rate of eGFR decline influence progression. Predicting who will progress allows timely access creation for dialysis, patient education about transplant options, and aggressive management of risk factors (e.g., stricter blood pressure control) to possibly slow kidney function decline.
+
+  - cohort_name: "Atrial Fibrillation - Ischemic Stroke Risk"
+    inclusion_criteria:
+      - code_type: ICD-10
+        codes: ["I48.0", "I48.1", "I48.91"]
+        description: "Non-valvular atrial fibrillation (paroxysmal, persistent, or unspecified)"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["I63.9", "G45.9"]
+        description: "Prior ischemic stroke or transient ischemic attack (historical cerebrovascular event)"
+      - code_type: ICD-10
+        codes: ["Z95.2"]
+        description: "Mechanical heart valve in place (valvular AF, managed differently)"
+    target_event:
+      code_type: ICD-10
+      codes: ["I63.9"]
+      description: "Thromboembolic stroke event (ischemic stroke due to AF)"
+    notes: |
+      Atrial fibrillation (AF) is a common arrhythmia that greatly increases the risk of ischemic stroke due to emboli from the fibrillating atria. The cohort includes patients with documented non-valvular AF (paroxysmal, persistent, or chronic), as identified by ICD-10 codes, to focus on those who need stroke risk assessment. We exclude individuals who have already suffered a stroke or transient ischemic attack (TIA) in the past, because they are no longer in a purely ‘pre-stroke’ state (their management is secondary prevention rather than primary). We also exclude those with mechanical heart valves, because their stroke prevention is managed with mandatory anticoagulation regardless of typical AF risk stratification (and their stroke risk is addressed separately). The target event is an ischemic stroke, such as an embolic stroke to the brain (coded as I63.*, cerebral infarction). Clinically, tools like the CHA2DS2-VASc score are used to estimate stroke risk in AF patients; factors include age, hypertension, diabetes, heart failure, and prior stroke (excluded here). A predictive model would similarly use those risk factors and perhaps lab or rhythm data to identify high-risk AF patients. Early identification means clinicians can initiate anticoagulation or other interventions to prevent a potentially debilitating or fatal stroke in these patients.
+
+  - cohort_name: "Anticoagulation Therapy - Major Bleeding"
+    inclusion_criteria:
+      - code_type: GPI
+        codes: ["832000", "83337030", "83370060", "83370010"]
+        description: "Use of anticoagulant medication (warfarin or direct oral anticoagulants)"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["I61.9", "K92.2"]
+        description: "History of major bleeding (e.g., past intracranial hemorrhage or gastrointestinal bleed)"
+    target_event:
+      code_type: ICD-10
+      codes: ["I61.9", "K92.2"]
+      description: "Major bleeding event (intracerebral hemorrhage or severe GI bleed)"
+    notes: |
+      Patients on anticoagulant therapy for conditions like AF or venous thromboembolism face a trade-off: while anticoagulation prevents clots, it raises the risk of major bleeding. This cohort includes patients actively on anticoagulant medications (warfarin or direct oral anticoagulants such as dabigatran, rivaroxaban, apixaban), identified by pharmacy claims (GPI codes for those drugs). We exclude anyone with a history of a major bleeding event, such as an intracranial hemorrhage or a significant gastrointestinal bleed, because such patients are already known to be high-risk and often have modified therapy (or have stopped anticoagulation). Instead, we focus on those without a prior major bleed. The target outcome is a major bleeding episode requiring medical attention, for example an intracerebral hemorrhage or a severe GI bleed. Clinically, risk assessment scores like HAS-BLED help gauge bleeding risk by considering factors like liver/kidney disease, prior stroke, labile INRs, age, etc. A predictive model would similarly consider these factors and perhaps concurrent medications (like NSAIDs or antiplatelets) to foresee which anticoagulated patients might bleed. This enables proactive measures: closer INR monitoring for warfarin patients, use of lower-risk anticoagulants, correction of anemia, or increased patient counseling on bleeding signs and avoiding injury.
+
+  - cohort_name: "Chronic COPD Exacerbation Hospitalization"
+    inclusion_criteria:
+      - code_type: ICD-10
+        codes: ["J44.0", "J44.1", "J44.9", "J43.9"]
+        description: "Chronic obstructive pulmonary disease (chronic bronchitis and emphysema codes)"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["E84.0"]
+        description: "Cystic fibrosis (separate chronic lung condition not included)"
+    target_event:
+      code_type: ICD-10
+      codes: ["J44.1"]
+      description: "Hospitalized acute COPD exacerbation"
+    notes: |
+      In COPD, periodic exacerbations (flare-ups of symptoms often triggered by infections) are a major cause of hospital admissions and health deterioration. We include patients with a diagnosis of COPD or emphysema (J44 and J43 code ranges), ensuring they have chronic lower respiratory disease as the baseline condition. We exclude those with cystic fibrosis, as that's a different pathology with different exacerbation patterns and management. The presence of CF could confound the cohort as CF patients also get lung infections but are treated differently. The target event is an acute COPD exacerbation severe enough to require hospitalization, typically signified by coding of an acute exacerbation. By predicting such hospitalizations, clinicians can intensify maintenance therapy (e.g., inhalers, pulmonary rehab) or provide action plans to patients (like starting steroids/antibiotics early in a flare) to mitigate severity. Known risk factors for frequent exacerbations include a history of prior exacerbations, continued smoking, poor inhaler adherence, and advanced disease (low FEV1). The model would use these to identify high-risk patients for interventions aimed at keeping them stable and out of the hospital.
+
+  - cohort_name: "Pediatric Asthma Severe Exacerbation"
+    inclusion_criteria:
+      - code_type: ICD-10
+        codes: ["J45.40", "J45.50", "J45.909"]
+        description: "Asthma diagnosis (moderate/severe persistent or unspecified type)"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["E84.0"]
+        description: "Cystic fibrosis (respiratory condition distinct from asthma)"
+    target_event:
+      code_type: ICD-10
+      codes: ["J45.901"]
+      description: "Severe asthma exacerbation (status asthmaticus)"
+    notes: |
+      Children with asthma can experience severe exacerbations, which may necessitate emergency department visits or hospitalization when standard outpatient treatments fail. The cohort focuses on pediatric asthma patients; inclusion uses asthma diagnostic codes (especially moderate to severe persistent asthma types or unspecified asthma) to identify those who truly have asthma. (In practice, we would also restrict by age to pediatric, but age filtering is assumed outside of code here.) We exclude conditions like cystic fibrosis that can cause respiratory issues but are not asthma, to maintain a homogeneous cohort. The target event is a severe asthma exacerbation, such as status asthmaticus, where the child has prolonged bronchospasm not relieved by initial therapy, often requiring intensive treatment. Knowing which children are at risk (perhaps due to factors like prior hospitalizations, allergen exposures, poor medication adherence, or certain socioeconomic factors) allows providers to intervene with strategies like adjusting controller medications, ensuring an asthma action plan is in place, addressing environmental triggers, or providing caregiver education. These steps can reduce the chances of a dangerous flare-up that lands the child in the hospital.
+
+  - cohort_name: "Post Knee Replacement Surgical Site Infection"
+    inclusion_criteria:
+      - code_type: CPT
+        codes: ["27447"]
+        description: "Total knee replacement surgery (primary arthroplasty of knee)"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["M00.86"]
+        description: "Pre-existing knee joint infection (e.g., septic arthritis at time of surgery)"
+    target_event:
+      code_type: ICD-10
+      codes: ["T84.50XA"]
+      description: "Prosthetic joint infection following knee replacement"
+    notes: |
+      Surgical site infections after a joint replacement are serious complications that often require additional surgeries and prolonged antibiotics. This cohort includes patients who underwent total knee arthroplasty (knee replacement), identified via the surgical CPT code. That ensures we are tracking a uniform surgical population at risk for a specific postoperative complication. We exclude cases where there was an active infection in the knee joint at the time of surgery (septic arthritis), since those surgeries are not routine elective replacements and have a different risk profile and purpose. The target event is a periprosthetic joint infection, coded as an infection of an internal joint prosthesis. These infections might present weeks to months post-op with joint pain, swelling, and systemic signs, often requiring the removal of the prosthesis. Risk factors for infection include diabetes, obesity, prolonged surgery duration, or immunosuppression. By predicting which patients are at higher risk of a TKA infection, healthcare teams can modify perioperative care: for example, optimizing blood sugar, using antibiotic cement, or closer postoperative monitoring. This can ultimately reduce the incidence of this costly and morbid complication.
+
+  - cohort_name: "Sepsis in Hospitalized Pneumonia Patients"
+    inclusion_criteria:
+      - code_type: ICD-10
+        codes: ["J18.9", "J15.9", "J13"]
+        description: "Community-acquired pneumonia diagnosis (e.g., unspecified, bacterial, pneumococcal)"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["A41.9"]
+        description: "Sepsis noted at admission (already present initially)"
+    target_event:
+      code_type: ICD-10
+      codes: ["A41.9"]
+      description: "Hospital-acquired sepsis (during pneumonia admission)"
+    notes: |
+      Patients admitted with pneumonia can sometimes worsen and develop sepsis, which significantly increases mortality. The cohort is defined by a diagnosis of pneumonia (community-acquired types like unspecified pneumonia, pneumococcal, or other bacterial pneumonia). This ensures we have individuals with a primary infection that could lead to sepsis. We exclude patients who were already septic upon presentation (meaning they already had sepsis at the time of admission) to focus on predicting sepsis that arises during hospitalization. The target event is the development of sepsis in the hospital, indicated by a sepsis diagnosis code appearing after admission. Typically this corresponds to progression to severe infection with organ dysfunction (like septic shock). From a care perspective, early prediction of which pneumonia patients might become septic means more intensive monitoring or preemptive ICU transfer for those individuals. It might also influence aggressive early treatments, such as broader-spectrum antibiotics or fluid resuscitation. Factors such as high fever, elevated respiratory rate, hypotension, high inflammatory markers, or comorbid immunosuppression are clues the model would leverage. Timely intervention can improve survival by preventing delays in recognizing sepsis.
+
+  - cohort_name: "Coronary Artery Disease - Recurrent MI"
+    inclusion_criteria:
+      - code_type: ICD-10
+        codes: ["I25.10", "I25.2", "I20.9"]
+        description: "Known coronary artery disease (atherosclerosis, old MI, or angina)"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["I21.4"]
+        description: "Acute myocardial infarction currently in progress (recent MI at baseline)"
+    target_event:
+      code_type: ICD-10
+      codes: ["I21.3", "I21.4"]
+      description: "New acute myocardial infarction (heart attack)"
+    notes: |
+      People with established coronary artery disease (CAD) remain at risk for future heart attacks. Included in this cohort are those with evidence of existing CAD, whether through a history of myocardial infarction (old MI scar), chronic coronary atherosclerosis, or documented angina pectoris. These criteria ensure the population has underlying coronary plaque that could destabilize. We exclude any patient who is in the midst of an acute myocardial infarction at baseline to avoid including those who are currently experiencing the outcome. Essentially, the model should start tracking after the initial event or during stable CAD periods to predict a subsequent MI. The target event is a new acute myocardial infarction (heart attack), which might be an ST-elevation MI or a non-ST-elevation MI. Clinically, this is akin to secondary prevention in cardiology: risk factors like uncontrolled cholesterol, high blood pressure, smoking, and lack of adherence to medications (aspirin, statins, etc.) contribute to repeat events. A predictive model could highlight patients with suboptimal risk factor control or high-risk features (like ongoing ischemia or poor left ventricular function) for interventions such as medication intensification or revascularization before they suffer another MI. The goal is to reduce recurrent events and their associated morbidity and mortality.
+
+  - cohort_name: "Major Depression - Suicide Risk"
+    inclusion_criteria:
+      - code_type: ICD-10
+        codes: ["F32.2", "F33.1", "F33.2"]
+        description: "Major depressive disorder (moderate or severe episodes)"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["F31.9", "F20.9"]
+        description: "Other primary psychiatric disorder (bipolar, schizophrenia)"
+      - code_type: ICD-10
+        codes: ["Z91.51"]
+        description: "Personal history of suicidal behavior (previous suicide attempt)"
+    target_event:
+      code_type: ICD-10
+      codes: ["R45.851"]
+      description: "Suicidal ideation or suicide attempt event"
+    notes: |
+      Among individuals with major depressive disorder, a critical concern is the risk of suicidal behavior. This cohort includes patients diagnosed with major depression (moderate to severe episodes), capturing those who are symptomatic and potentially at risk for suicide. We exclude people with other primary psychiatric disorders like bipolar disorder or schizophrenia to narrow the focus to unipolar depression; these conditions carry their own suicide risks but also differ in management (e.g., bipolar depression might require different treatment). Additionally, anyone with a documented history of suicidal behavior is excluded because they are already identified as high risk and likely receiving special attention (the model is meant to identify new or unrecognized risk). The target outcome is the emergence of serious suicidal ideation or an actual suicide attempt that comes to medical attention. Often this would involve an ER visit for suicidality or self-harm. In practice, clinicians assess suicide risk with factors such as previous attempts, severity of depression, substance abuse, and social support. The model would analyze similar factors from the health record (diagnoses, hospitalizations, perhaps PHQ-9 scores if available) to predict risk. If we can flag depressed patients at high risk of an attempt, proactive measures like closer psychiatric follow-up, safety planning, involving family, or even temporary hospitalization can be implemented to prevent self-harm.
+
+  - cohort_name: "Pregnancy - Preterm Birth Risk"
+    inclusion_criteria:
+      - code_type: ICD-10
+        codes: ["Z34.90"]
+        description: "Routine prenatal care for normal pregnancy"
+      - code_type: ICD-10
+        codes: ["O09.90"]
+        description: "Supervision of high-risk pregnancy (unspecified trimester)"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["O30.0"]
+        description: "Multiple gestation (e.g., twin pregnancy)"
+      - code_type: ICD-10
+        codes: ["O60.00"]
+        description: "Current preterm labor without delivery"
+    target_event:
+      code_type: ICD-10
+      codes: ["O60.14X0"]
+      description: "Preterm birth (preterm labor with preterm delivery)"
+    notes: |
+      Preventing preterm birth is a major goal in obstetrics because prematurity is a leading cause of neonatal morbidity and mortality. This cohort encompasses pregnant women under routine or high-risk prenatal care (Z34 for normal pregnancies, O09 for those flagged as high-risk), ensuring the model monitors expecting mothers in mid to late pregnancy. We exclude multiple gestations (twins, triplets) since they have a significantly elevated preterm birth risk inherently and often are managed differently (they might bias the model as nearly all twin pregnancies deliver earlier). We also exclude women who have already gone into preterm labor during the pregnancy because at that point the outcome (preterm birth) is often imminent or at least not unpredictable. The target event is a preterm delivery, indicated by ICD codes for preterm labor with preterm delivery (for example, a birth at 32 weeks). Key risk factors that a model would use include prior preterm births, a short cervical length on ultrasound, uterine anomalies, infections, or certain obstetric complications (like bleeding or hypertension). By forecasting which pregnancies are likely to end prematurely, providers can implement measures like cervical cerclage, progesterone supplementation, increased surveillance, or patient instructions on recognizing early labor signs. These interventions aim to prolong pregnancy or ensure that when early delivery happens, the setting is optimal (such as delivering at a facility with a NICU and giving steroids to mature the fetal lungs).
+
+  - cohort_name: "Chemotherapy - Neutropenic Complication"
+    inclusion_criteria:
+      - code_type: ICD-10
+        codes: ["Z51.11"]
+        description: "Encounter for antineoplastic chemotherapy (actively receiving chemo)"
+      - code_type: HCPCS
+        codes: ["J9190"]
+        description: "Chemotherapy drug administration (e.g., Fluorouracil injection)"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["Z51.5"]
+        description: "Palliative care/hospice patient"
+    target_event:
+      code_type: ICD-10
+      codes: ["D70.1"]
+      description: "Chemotherapy-induced neutropenia (agranulocytosis)"
+    notes: |
+      Aggressive chemotherapy can cause bone marrow suppression, leading to neutropenia and potentially life-threatening infections (febrile neutropenia). This cohort includes cancer patients actively receiving chemotherapy, identified either by a specific chemotherapy administration code or the presence of a chemotherapy encounter. This ensures the model monitors those currently under chemo treatment. Patients in hospice care are excluded because their treatment is not curative and the concern for preventing complications is balanced differently (they might accept more risk for the sake of comfort, and predicting complications might not change management in end-of-life care). The target event is an episode of chemotherapy-induced neutropenia, especially if accompanied by fever/infection, requiring medical intervention. In coding terms, this might appear as agranulocytosis due to chemo. Risk factors captured could include the type of chemotherapy (some regimens are more myelosuppressive), patient age, baseline blood counts, and whether they received prophylactic growth factors. By predicting neutropenic complications, oncologists can preemptively adjust doses or provide colony-stimulating factors (like filgrastim) for patients flagged at high risk, and set up early infection monitoring or prophylactic antibiotics. This can reduce hospitalizations for neutropenic fever and keep patients on track with their cancer treatment schedule.
+
+  - cohort_name: "Diabetic Foot Ulcer - Amputation Risk"
+    inclusion_criteria:
+      - code_type: ICD-10
+        codes: ["E11.621"]
+        description: "Type 2 diabetes with foot ulcer"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["Z89.4", "Z89.5"]
+        description: "Previous lower extremity amputation (toe, foot, or leg already amputated)"
+    target_event:
+      code_type: CPT
+      codes: ["27590", "27880", "28820"]
+      description: "Lower extremity amputation (above-knee, below-knee, or toe amputation)"
+    notes: |
+      Diabetes can lead to neuropathy and peripheral arterial disease, resulting in foot ulcers that sometimes progress to non-healing wounds and require amputation. This cohort includes diabetic patients with an active foot ulcer, which signifies significant foot pathology and risk for limb loss. We exclude patients who have already had a major lower extremity amputation because the outcome (at least on one limb) has already occurred; their risk profile and goals (prosthetic rehab, preventing contralateral limb loss) differ from someone with two intact limbs. The target event is a lower extremity amputation procedure (ranging from toe amputation up to above-knee amputation) subsequent to the ulcer. Clinically, factors like infection (osteomyelitis), ulcer depth, poor blood supply, and lack of wound healing drive the need for amputation. Early identification of high-risk ulcer patients allows for aggressive interventions: improved wound care, revascularization surgeries, advanced therapies (like negative pressure wound therapy), or tighter glucose control to try to salvage the limb. Preventing amputations is crucial as they carry high morbidity, mortality, and impact on patient quality of life.
+
+  - cohort_name: "Mild Cognitive Impairment - Dementia Progression"
+    inclusion_criteria:
+      - code_type: ICD-10
+        codes: ["G31.84"]
+        description: "Mild cognitive impairment (without dementia)"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["F03.90", "G30.9"]
+        description: "Existing dementia diagnosis (unspecified or Alzheimer’s)"
+    target_event:
+      code_type: ICD-10
+      codes: ["G30.9", "F03.90"]
+      description: "Onset of dementia (e.g., Alzheimer disease diagnosis)"
+    notes: |
+      Patients with mild cognitive impairment have measurable cognitive deficits but can still function independently; however, a significant portion will progress to dementia over time. The cohort is defined by an MCI diagnosis, ensuring the individuals have documented memory/cognitive issues beyond normal aging but not yet dementia. We exclude anyone who already has dementia (Alzheimer’s or otherwise) since the objective is to predict new conversion to dementia from a pre-dementia state. The target event is a new diagnosis of dementia, which could be Alzheimer’s disease or another type of degenerative dementia, indicating that cognitive decline has progressed to the point of impairing daily living. Clinically, markers like rapid decline on cognitive tests, biomarker evidence (e.g., amyloid on PET scan, if available), or vascular risk factors could inform risk. If a model flags an MCI patient as high risk for imminent progression, clinicians might prioritize interventions: starting cognitive enhancers earlier, aggressive vascular risk factor control, or planning for the patient’s future needs. It also helps in counseling patients and families regarding prognosis. Early detection of dementia allows timely implementation of safety measures (like driving cessation if needed) and connection to support services.
+
+  - cohort_name: "Chronic Opioid Therapy - Overdose Risk"
+    inclusion_criteria:
+      - code_type: GPI
+        codes: ["65"]
+        description: "Chronic opioid analgesic use (ongoing narcotic pain medication prescriptions)"
+      - code_type: ICD-10
+        codes: ["M54.50"]
+        description: "Chronic pain condition (e.g., chronic low back pain)"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["Z51.5"]
+        description: "Hospice/palliative care patient"
+    target_event:
+      code_type: ICD-10
+      codes: ["T40.2X1"]
+      description: "Accidental opioid overdose (acute opioid poisoning)"
+    notes: |
+      Chronic opioid therapy for non-cancer pain is known to carry a risk of overdose as patients may accidentally take too much or combine with other sedatives, and their tolerance changes over time. This cohort identifies patients on long-term opioid treatment, evidenced by ongoing opioid prescriptions (GPI for narcotic analgesics) and typically accompanied by a chronic pain diagnosis such as chronic low back pain. The pain diagnosis ensures we capture chronic users rather than a short post-surgical course. We exclude those in hospice or end-of-life care, as in that context medication dosing priorities differ and overdose risk is less relevant to mitigate (those patients are monitored in a different way). The target is an unintentional opioid overdose event. This could manifest as an emergency visit for poisoning by opioids or use of naloxone in response to respiratory depression. Risk factors the model would consider include high opioid dosages (for example, >90 MME/day), concomitant benzodiazepine use, history of substance use disorder, and mental health conditions. By predicting overdose risk, providers can take preventive action: tapering doses, scheduling more frequent follow-ups, providing naloxone kits to patients and families, or transitioning the patient to addiction treatment if appropriate. Early action can literally save lives by averting potentially fatal overdose scenarios.
+
+  - cohort_name: "Osteoporosis - Hip Fracture Risk"
+    inclusion_criteria:
+      - code_type: ICD-10
+        codes: ["M81.0"]
+        description: "Age-related (primary) osteoporosis without current pathological fracture"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["S72.0", "S72.1"]
+        description: "History of hip fracture (prior femoral fracture)"
+    target_event:
+      code_type: ICD-10
+      codes: ["S72.0", "S72.1"]
+      description: "New osteoporotic hip fracture (femoral neck or intertrochanteric)"
+    notes: |
+      Hip fractures in the elderly often result from underlying osteoporosis combined with falls, and preventing these fractures is a key goal to maintain independence in older adults. The cohort includes patients with diagnosed osteoporosis (primary, age-related) who have not yet sustained a hip fracture. We exclude those who have already had a hip fracture previously, as they have essentially experienced the outcome and their subsequent management (e.g., rehab, perhaps already on treatment) changes their future risk profile. The target event is an osteoporotic hip fracture, typically femoral neck or intertrochanteric fractures from a standing height fall (low-trauma fracture). Risk factors include advanced age, very low bone mineral density, prior fragility fractures of other bones, gait instability, and not being on osteoporosis medication. A predictive model might incorporate bone density scores if available, or proxies like prior fracture codes, steroid use, or conditions like hyperthyroidism that affect bone. Predicting this allows interventions such as starting bisphosphonates or other osteoporosis therapies, initiating fall prevention strategies (home safety evaluations, balance exercises, vision correction), and correcting vitamin D deficiency, all aiming to strengthen bone and prevent that potentially devastating hip fracture.
+
+  - cohort_name: "NSAID Use - Ulcer Bleeding Risk"
+    inclusion_criteria:
+      - code_type: GPI
+        codes: ["64"]
+        description: "Use of NSAID medication (non-narcotic analgesics)"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["K25.4", "K92.2"]
+        description: "History of peptic ulcer hemorrhage or any GI bleed"
+    target_event:
+      code_type: ICD-10
+      codes: ["K25.0", "K26.0"]
+      description: "Peptic ulcer with acute hemorrhage (gastric or duodenal ulcer bleed)"
+    notes: |
+      Chronic NSAID use can cause peptic ulcers and bleeding due to their effect on the gastric mucosa. Anticipating which patients might develop a serious bleed can help implement gastroprotective strategies. The cohort is composed of patients who are using NSAIDs regularly (for arthritis, chronic pain, etc.), identified through pharmacy coding. This indicates significant exposure to the ulcer risk factor. Exclusion criteria filter out those who have a known history of ulcer bleeding or gastrointestinal hemorrhage, as they are already recognized as high-risk and likely have interventions in place (like being prescribed proton pump inhibitors or having been advised to avoid NSAIDs). The focus is on those without such history. The target event is an acute upper gastrointestinal bleeding episode, typically from a peptic ulcer, such as a bleeding gastric or duodenal ulcer. These events often present with hematemesis or melena and require urgent care. Risk factors for NSAID gastropathy include higher NSAID doses, older age, concurrent use of corticosteroids or anticoagulants, and H. pylori infection. The predictive model would look at medication records, possibly prior dyspepsia diagnoses, and patient demographics to identify who might bleed. Proactively, those flagged at high risk might be recommended for routine use of protective agents (like PPIs), safer analgesic alternatives, or more frequent check-ins for early symptoms, thereby reducing the incidence of catastrophic GI bleeds.
+
+  - cohort_name: "Sickle Cell Disease - Pain Crisis"
+    inclusion_criteria:
+      - code_type: ICD-10
+        codes: ["D57.1", "D57.20", "D57.40"]
+        description: "Sickle cell disease (HbSS, HbSC, or sickle beta-thalassemia) without current crisis"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["D57.3"]
+        description: "Sickle cell trait (carrier state only)"
+    target_event:
+      code_type: ICD-10
+      codes: ["D57.00", "D57.21", "D57.41"]
+      description: "Vaso-occlusive sickle cell crisis (pain crisis or acute chest syndrome)"
+    notes: |
+      Sickle cell disease (SCD) is characterized by periodic vaso-occlusive crises causing severe pain and potential organ damage due to sickled red blood cells blocking capillaries. The cohort includes patients with the major forms of sickle cell disease (homozygous sickle cell anemia HbSS, sickle-hemoglobin C disease, or sickle beta-thalassemia) during their steady state (no current crisis). We exclude those with only the sickle cell trait, as carriers typically do not experience vaso-occlusive pain crises. The target event is a documented vaso-occlusive crisis, which often leads to hospitalizations for pain management (and can include complications like acute chest syndrome). Risk factors for crises include dehydration, infection, cold exposure, or just the natural frequency in a given patient. Predicting an impending pain crisis could be challenging, but patterns such as frequent prior crises, high baseline hemolysis, or poor hydroxyurea adherence might signal risk. Clinically, if we can foresee which SCD patients are likely to have a severe crisis, we could intensify preventive measures (ensure hydroxyurea usage, provide transfusions in some cases, or patient education on avoiding triggers and early intervention at pain onset) to reduce hospitalizations and complications.
+
+  - cohort_name: "High-Risk Immobility - Pressure Ulcer"
+    inclusion_criteria:
+      - code_type: ICD-10
+        codes: ["Z74.01"]
+        description: "Bed confinement (bedridden status)"
+      - code_type: ICD-10
+        codes: ["Z99.3"]
+        description: "Dependence on wheelchair"
+      - code_type: ICD-10
+        codes: ["G82.20"]
+        description: "Paraplegia (complete paralysis of lower limbs)"
+    exclusion_criteria:
+      - code_type: ICD-10
+        codes: ["L89.9"]
+        description: "Existing pressure ulcer (any stage)"
+    target_event:
+      code_type: ICD-10
+      codes: ["L89.152"]
+      description: "New pressure ulcer (e.g., stage 2 ulcer on sacrum)"
+    notes: |
+      Patients who are immobile, such as those who are bedbound or in wheelchairs, have continuous pressure on certain skin areas, leading to pressure ulcer formation if not properly managed. This cohort identifies such high-risk individuals via codes for bed confinement, wheelchair dependence, or paralysis (paraplegia), which are conditions that severely limit mobility. These conditions often co-occur with extended nursing care or hospital stays. We exclude patients who already have a pressure ulcer at baseline, since they are already in a treatment pathway for that ulcer; the goal here is to predict new ulcers. Once a patient has any pressure ulcer, their care changes (e.g., they might be on a turning schedule, special mattress), so we focus on those ulcer-free initially. The target event is the development of a pressure ulcer, such as a stage II ulcer on the sacrum (a common location for bedridden patients). Relevant factors include the patient’s nutritional status, continence (moisture can worsen skin integrity), and the level of nursing care available. A predictive model might incorporate those via proxies (albumin levels for nutrition, incontinence diagnoses, staffing levels perhaps). If we can predict who is likely to get a pressure sore, healthcare providers can intensify preventive measures like more frequent repositioning, advanced pressure-relieving support surfaces (mattresses/cushions), and skin inspections. This proactive approach can prevent painful ulcers and serious complications like infections (cellulitis, osteomyelitis) that often follow.
