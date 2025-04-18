@@ -1,0 +1,208 @@
+cohorts:
+  - name: "Future Need for Total Knee Replacement (TKR)"
+    rationale: "Identify patients who may need a knee replacement soon, based on osteoarthritis severity or prior conservative treatments."
+    inclusion_criteria:
+      icd10cm: ["M17"]  # Osteoarthritis of knee
+      cpt_hcpcs_procedures: ["20610", "29870", "97110"]  # Joint injection, arthroscopy, PT/OT examples
+      age_range: [50, 120]
+    exclusion_criteria:
+      icd10cm: ["C80"]  # Advanced malignancy code example (placeholder)
+      cpt_hcpcs_procedures: ["27447"]  # Total knee replacement code
+    notes: "Look back 1-2 years for arthroscopy or repeated injections. Patients with prior knee replacement are excluded."
+
+  - name: "Likelihood of Coronary Artery Bypass Graft (CABG)"
+    rationale: "Identify patients with advanced coronary artery disease likely to require CABG surgery."
+    inclusion_criteria:
+      icd10cm: ["I25"]  # Chronic ischemic heart disease
+      cpt_hcpcs_procedures: ["92928"]  # PCI (stent) example
+      gpi_medications: ["statins", "beta_blockers"]  # Placeholder for relevant GPI classes
+    exclusion_criteria:
+      cpt_hcpcs_procedures: ["33510", "33536"]  # CABG codes
+      icd10cm: ["Z51.5"]  # Hospice care (example)
+    notes: "Statins and beta-blockers are commonly used to manage CAD; adjust GPI details. Exclude patients who already had CABG."
+
+  - name: "Progression to Dialysis for Chronic Kidney Disease (CKD)"
+    rationale: "Identify CKD Stage 3–4 patients at high risk of needing renal replacement therapy (dialysis) in the near future."
+    inclusion_criteria:
+      icd10cm: ["N18.3", "N18.4"]  # CKD stage 3, 4
+      gpi_medications: ["ACE_inhibitors", "ARBs"]  # Common CKD management drugs
+    exclusion_criteria:
+      cpt_hcpcs_procedures: ["90935", "90937"]  # Dialysis sessions
+      icd10cm: ["Z94.0"]  # Kidney transplant status
+    notes: "Look for consistent nephrology visits or lab-based deterioration if available. Exclude ESRD or dialysis patients."
+
+  - name: "Future Biologic Therapy for Rheumatoid Arthritis"
+    rationale: "Identify RA patients likely to need biologic DMARDs soon."
+    inclusion_criteria:
+      icd10cm: ["M05", "M06"]  # Rheumatoid arthritis
+      gpi_medications: ["methotrexate"]  # Example conventional DMARD
+    exclusion_criteria:
+      gpi_medications: ["adalimumab", "etanercept"]  # Already on biologics
+      icd10cm: ["A15"]  # Example: Active TB (contraindication)
+    notes: "Patients failing methotrexate or multiple conventional DMARDs often escalate to biologic therapy."
+
+  - name: "Future Insulin Therapy for Type 2 Diabetes (T2DM)"
+    rationale: "Identify T2DM patients whose disease may progress to require insulin."
+    inclusion_criteria:
+      icd10cm: ["E11"]  # Type 2 diabetes
+      gpi_medications: ["metformin", "sulfonylureas"]  # Non-insulin oral agents
+    exclusion_criteria:
+      gpi_medications: ["insulin"]  # Already on insulin
+      icd10cm: ["E10"]  # Type 1 diabetes
+    notes: "Look for signs of poor glycemic control or multiple therapy escalations."
+
+  - name: "Risk of Long-Term Opioid Use"
+    rationale: "Identify patients with chronic pain who might escalate to opioid therapy."
+    inclusion_criteria:
+      icd10cm: ["G89", "M54.5"]  # Chronic pain, chronic low back pain
+      gpi_medications: ["NSAIDs"]  # Currently using non-opioid analgesics
+    exclusion_criteria:
+      gpi_medications: ["opioids"]  # Already on opioids
+      icd10cm: ["F11"]  # Opioid use disorder
+    notes: "Useful to track patients who repeatedly fail conservative pain treatments and might transition to opioids."
+
+  - name: "Future Antidepressant Use for Major Depression"
+    rationale: "Identify patients with major depression who are not on antidepressants yet but may start soon."
+    inclusion_criteria:
+      icd10cm: ["F32", "F33"]  # Major depressive disorder
+      cpt_hcpcs_procedures: ["90837", "90834"]  # Psychotherapy codes
+    exclusion_criteria:
+      gpi_medications: ["SSRIs", "SNRIs", "bupropion"]  # Already on antidepressants
+      icd10cm: ["F31"]  # Bipolar disorder
+    notes: "Patients with repeated depressive episodes or frequent mental health visits might be considered for medication."
+
+  - name: "Future Acute Myocardial Infarction (AMI) Needing Intervention"
+    rationale: "Identify high-risk patients likely to have an MI requiring stent or other acute care."
+    inclusion_criteria:
+      icd10cm: ["I20"]  # Angina pectoris
+      other_risk_factors: ["hypertension", "hyperlipidemia"]  # Could be ICD-10 or derived
+    exclusion_criteria:
+      icd10cm: ["I21"]  # Recent/ongoing MI
+      icd10cm: ["Z51.5"]  # Hospice
+    notes: "Often combined with medication usage like statins or antiplatelets. Predicting near-future MI events."
+
+  - name: "Future Colonoscopy for Average-Risk Adults"
+    rationale: "Identify individuals who are due for a routine screening colonoscopy."
+    inclusion_criteria:
+      age_range: [45, 75]
+      cpt_hcpcs_procedures_absent_for_x_years: ["45378"]  # Screening colonoscopy
+    exclusion_criteria:
+      icd10cm: ["Z80.0"]  # Family history of malignant neoplasm of digestive organs (high-risk schedule)
+      cpt_hcpcs_procedures: ["45385"]  # Polypectomy within last 3 years (different schedule)
+    notes: "Check last colonoscopy date. Average-risk screening intervals vary (5–10 years)."
+
+  - name: "Future Bariatric Surgery"
+    rationale: "Identify obese patients likely to qualify for and undergo bariatric procedures."
+    inclusion_criteria:
+      icd10cm: ["E66"]  # Obesity
+      cpt_hcpcs_procedures: ["97802", "97803"]  # Nutritional counseling or similar
+    exclusion_criteria:
+      cpt_hcpcs_procedures: ["43644", "43775"]  # Previous bariatric surgery
+      icd10cm: ["I50"]  # Severe heart failure as a possible contraindication
+    notes: "Look at repeated weight-management attempts or obesity-related comorbidities such as T2DM, HTN."
+
+  - name: "Future Biologic Therapy for Inflammatory Bowel Disease (IBD)"
+    rationale: "Identify Crohn’s/UC patients likely to escalate to biologics."
+    inclusion_criteria:
+      icd10cm: ["K50", "K51"]  # Crohn’s disease, Ulcerative colitis
+      gpi_medications: ["aminosalicylates", "steroids"]  # Standard therapies
+    exclusion_criteria:
+      gpi_medications: ["infliximab", "adalimumab"]  # Already on biologics
+      icd10cm: ["A15"]  # Active TB (contraindication)
+    notes: "Frequent GI visits or steroid bursts may indicate unresponsive disease."
+
+  - name: "Progression of Diabetic Retinopathy Requiring Intervention"
+    rationale: "Identify diabetics likely to need laser photocoagulation or surgery."
+    inclusion_criteria:
+      icd10cm: ["E11.3"]  # Type 2 diabetes with retinopathy
+      cpt_hcpcs_procedures: ["92250"]  # Fundus photography or other eye exam codes
+    exclusion_criteria:
+      cpt_hcpcs_procedures: ["67210", "67228"]  # Previous laser photocoagulation
+      icd10cm: ["Z51.5"]  # Hospice or end-of-life care
+    notes: "If tracking eye exam frequency, add logic for repeated abnormal findings or progressive retinopathy."
+
+  - name: "Future Immunotherapy for Cancer"
+    rationale: "Identify oncology patients who may require immunotherapy (checkpoint inhibitors, etc.)."
+    inclusion_criteria:
+      icd10cm: ["Cxx"]  # Any malignant neoplasm range
+      gpi_medications: ["chemotherapeutic_agents"]  # Conventional chemo usage
+    exclusion_criteria:
+      gpi_medications: ["pembrolizumab", "nivolumab"]  # Already on immunotherapy
+      icd10cm: ["Z51.5"]  # Hospice/palliative
+    notes: "Molecular markers or stage often guide immunotherapy decisions. Use placeholders for relevant codes."
+
+  - name: "Future Hormonal Therapy for Breast Cancer"
+    rationale: "Identify female breast cancer patients likely to start adjuvant hormonal therapy."
+    inclusion_criteria:
+      gender: "F"
+      icd10cm: ["C50"]  # Malignant neoplasm of breast
+      cpt_hcpcs_procedures: ["19301", "19302", "19303"]  # Lumpectomy/mastectomy examples
+    exclusion_criteria:
+      gpi_medications: ["tamoxifen", "aromatase_inhibitors"]  # Already on hormonal therapy
+      icd10cm: ["C78"]  # Metastatic disease (may have different treatment plan)
+    notes: "Typical use-case: post-surgical adjuvant therapy in estrogen-receptor positive patients."
+
+  - name: "Future Joint Injection Therapy for Osteoarthritis"
+    rationale: "Identify OA patients likely to need intra-articular injections (corticosteroids, hyaluronic acid)."
+    inclusion_criteria:
+      icd10cm: ["M17", "M19"]  # Knee and other osteoarthritis
+      cpt_hcpcs_procedures: ["97110"]  # Physical therapy, or analgesic use
+    exclusion_criteria:
+      cpt_hcpcs_procedures: ["20610"]  # Intra-articular injection if done recently (e.g., within 6 months)
+      icd10cm: ["M00"]  # Septic arthritis
+    notes: "Patients failing conservative management (PT, NSAIDs) may escalate to injections prior to surgery."
+
+  - name: "Future Advanced Imaging (MRI/CT) in Neurological Disorders"
+    rationale: "Identify patients with persistent or worsening neurological symptoms who may need advanced imaging."
+    inclusion_criteria:
+      icd10cm: ["G40", "G43", "G35"]  # Epilepsy, migraines, multiple sclerosis
+      cpt_hcpcs_procedures_absent_for_x_months: ["70551", "70552"]  # MRI brain codes example
+    exclusion_criteria:
+      cpt_hcpcs_procedures_recent: ["70551"]  # Already had MRI/CT recently
+      icd10cm: ["Z98.89"]  # Post-surgical status (placeholder example)
+    notes: "Depending on frequency of episodes, a neurologist might order imaging. Adjust code sets for CT if needed."
+
+  - name: "Future Screening Mammography in Average-Risk Women"
+    rationale: "Identify women due for routine screening mammogram based on age and screening intervals."
+    inclusion_criteria:
+      gender: "F"
+      age_range: [40, 74]
+      cpt_hcpcs_procedures_absent_for_x_months: ["77067"]  # Screening mammogram
+    exclusion_criteria:
+      icd10cm: ["Z15.01"]  # BRCA1 genetic susceptibility
+      cpt_hcpcs_procedures: ["77065"]  # Diagnostic mammogram if recent suspicious findings
+    notes: "Average-risk screening intervals ~1–2 years. High-risk patients need more frequent screenings."
+
+  - name: "Risk of COPD Exacerbation Requiring Hospitalization"
+    rationale: "Identify COPD patients likely to have an acute exacerbation soon."
+    inclusion_criteria:
+      icd10cm: ["J44"]  # COPD
+      gpi_medications: ["inhaled_steroids", "long_acting_bronchodilators"]
+      prior_exacerbation_event: true  # e.g., ER or inpatient stay in last year
+    exclusion_criteria:
+      icd10cm: ["Z99.81"]  # Dependence on supplemental oxygen or mechanical ventilation (end-stage)
+      icd10cm: ["Z51.5"]   # Hospice
+    notes: "Look for repeated rescue inhaler refills or antibiotic/steroid bursts."
+
+  - name: "Future Pediatric Tympanostomy Tube Placement"
+    rationale: "Identify children with recurrent otitis media requiring ear tube insertion."
+    inclusion_criteria:
+      age_range: [0, 12]
+      icd10cm: ["H65", "H66"]  # Otitis media
+      cpt_hcpcs_procedures: ["99203", "99213"]  # Multiple pediatric/ENT consult visits
+    exclusion_criteria:
+      cpt_hcpcs_procedures: ["69436"]  # Recent tympanostomy tube placement
+      icd10cm: ["Q35", "Q37"]  # Cleft palate/lip as it changes management
+    notes: "Focus on repeated antibiotic prescriptions or repeated ENT visits. Could track GPI-coded pediatric antibiotics."
+
+  - name: "Future Cataract Surgery in Elderly"
+    rationale: "Identify older patients with cataracts who may progress to needing surgery."
+    inclusion_criteria:
+      age_range: [65, 120]
+      icd10cm: ["H25", "H26"]  # Cataract
+      cpt_hcpcs_procedures_absent_for_x_years: ["66984"]  # No recent cataract surgery
+    exclusion_criteria:
+      cpt_hcpcs_procedures: ["66984"]  # Already done cataract surgery (same eye)
+      icd10cm: ["H35"]  # Advanced macular degeneration (could limit benefit of surgery)
+    notes: "Look for declining visual acuity or multiple ophthalmology consultations. Adjust codes for unilateral/bilateral."
+
